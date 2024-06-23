@@ -1,0 +1,6 @@
+USER fuzzing
+PASS fuzzing
+PASV
+LIST
+STAT
+QUIT
