@@ -262,7 +262,7 @@ apt-get -y install dnsutils
 git clone http://thekelleys.org.uk/git/dnsmasq.git  
 cd dnsmasq  
 git checkout v2.73rc6  
-patch -p1 < $AFLNET/tutorials/dnsmasq/dnsmasq.patch(只需要打这个补丁就可以了)  
+patch -p1 < $AFLNET/tutorials/dnsmasq/dnsmasq.patch(还需要修改config.h)  
 CC=afl-clang-fast make  
 cp $AFLNET/tutorials/dnsmasq/dnsmasq.conf /etc/  
 cd src/  
