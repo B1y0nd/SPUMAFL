@@ -252,3 +252,45 @@ cp /usr/mips-linux-gnu/lib/ld.so.1 /lib/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/mips-linux-gnu/lib  
 source /etc/profile  
 afl-fuzz -d -i $AFLNET/tutorials/mosquitto/in-mqtt -o ./out-mqtt -m none -N tcp://127.0.0.1/1883 -P MQTT -D 10000 -q 3 -s 3 -E -K -R -Q ./src/mosquitto  
+# Dnsmasq对比实验  
+## AFLNET直接对其进行模糊测试  
+1.aflnet运行Dnsmasq  
+安装依赖  
+apt-get install sudo  
+apt-get -y install dnsutils  
+编译与安装  
+git clone http://thekelleys.org.uk/git/dnsmasq.git  
+cd dnsmasq  
+git checkout v2.73rc6  
+patch -p1 < $AFLNET/tutorials/dnsmasq/dnsmasq.patch(还需要修改config.h)  
+CC=afl-clang-fast make  
+cp $AFLNET/tutorials/dnsmasq/dnsmasq.conf /etc/  
+cd src/  
+echo address=/google.com/5.5.5.5 | sudo tee -a /etc/dnsmasq.conf  
+模糊测试  
+afl-fuzz -d -i $AFLNET/tutorials/dnsmasq/in-dns -o out-dns -m none -N tcp://127.0.0.1/5353 -P DNS -D 10000 -K -R ./dnsmasq  
+## SPUMAFL运行Dnsmasq  
+2.spumafl运行Dnsmasq  
+安装依赖  
+apt-get install sudo  
+apt-get -y install dnsutils  
+编译与安装  
+git clone http://thekelleys.org.uk/git/dnsmasq.git  
+cd dnsmasq  
+git checkout v2.73rc6  
+patch -p1 < $AFLNET/tutorials/dnsmasq/dnsmasq.patch(还需要打另一个文件里面的所有补丁)  
+CC=mips-linux-gnu-gcc make clean all  
+cp $AFLNET/tutorials/dnsmasq/dnsmasq.conf /etc/  
+cd src/  
+echo address=/google.com/5.5.5.5 | sudo tee -a /etc/dnsmasq.conf  
+模糊测试  
+cp /usr/mips-linux-gnu/lib/ld.so.1 /lib/  
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/mips-linux-gnu/lib  
+source /etc/profile  
+afl-fuzz -d -i $AFLNET/tutorials/dnsmasq/in-dns -o out-dns -m none -N tcp://127.0.0.1/5353 -P DNS -D 10000 -K -R -Q ./dnsmasq  
+Note: 记得修改DNS: 20185479  
+Note: 漏洞重放工作
+1.make CFLAGS="-fsanitize=address -g" LDFLAGS="-fsanitize=address"检测内存漏洞
+2.aflnet-replay spumafl的crashes的时候需要把utils.c文件中read_write函数的循环读取删掉。
+aflnet-replay aflnet的crashes的时候不需要修改utils.c文件(存在两条消息合为一条消息导致漏洞的情况)。
+

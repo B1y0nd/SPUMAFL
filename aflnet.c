@@ -381,7 +381,7 @@ region_t* extract_requests_dns(unsigned char* buf, unsigned int buf_size, unsign
     memcpy(&mem[mem_count], buf + byte_count, 1);
 
     // A DNS header is 12 bytes long & the 1st null byte after that indicates the end of the query.
-    if ((mem_count >= 12) && (*(mem+mem_count) == 0)) {
+    if ((mem_count >= 16) && (*(mem+mem_count) == 0)) {
       // 4 bytes left of the tail.
       cur_end += 4;
       byte_count += 4;
@@ -1071,13 +1071,13 @@ unsigned int* extract_response_codes_dns(unsigned char* buf, unsigned int buf_si
     memcpy(&mem[mem_count], buf + byte_count, 1);
 
     // The original query will be included with the response.
-    if ((mem_count >= 12) && (*(mem+mem_count) == 0)) {
+    if ((mem_count >= 16) && (*(mem+mem_count) == 0)) {
       // 4 bytes left of the query. Jump to the answer.
       byte_count += 5;
       mem_count += 5;
 
       // Save the 3rd & 4th bytes as the response code
-      unsigned int message_code = (unsigned int) ((mem[2] << 8) + mem[3]);
+      unsigned int message_code = (unsigned int) ((mem[6] << 8) + mem[7]);
 
       state_count++;
       state_sequence = (unsigned int *)ck_realloc(state_sequence, state_count * sizeof(unsigned int));

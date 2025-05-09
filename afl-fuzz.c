@@ -454,7 +454,7 @@ void build_path(const char *prefix)
 /* Initialize the filename of request and response */
 void setup_request_and_response_file()
 {
-  if(!strcmp(protocol_name, "RTSP") || !strcmp(protocol_name, "MQTT"))
+  if(!strcmp(protocol_name, "RTSP") || !strcmp(protocol_name, "MQTT") || !strcmp(protocol_name, "DNS"))
   {
       char prefix[] = "/home/ubuntu/";
       build_path(prefix);

@@ -992,7 +992,7 @@ void read_config()
     sscanf(line, "%[^:]:%d", protocol, &protocol_id);
     printf("[QEMU]protocol is %s, protocol_id is %d!\n",protocol,protocol_id);
     fclose(fp);
-    if(protocol_id == 20185476 || protocol_id == 20185478)
+    if(protocol_id == 20185476 || protocol_id == 20185478 || protocol_id == 20185479)
     {
         char prefix[] = "/home/ubuntu/";
         build_path(prefix);
@@ -1139,7 +1139,8 @@ abi_long feed_message_to_buffer(CPUArchState *env, int syscall_num)
     int len = env->regs[2];
     char *buf = g2h(env->regs[1]);
 #endif
-    if(protocol_id != 20185478){
+    if(protocol_id == 20185476 || protocol_id == 20185477)
+    {
         if(!is_last_message)
         {
             get_current_message();
@@ -1165,7 +1166,9 @@ abi_long feed_message_to_buffer(CPUArchState *env, int syscall_num)
 
         }
         return ret;
-    }else{
+    }
+    else if(protocol_id == 20185478)
+    {
         if(pre_message_nums != message_nums){
             get_current_message();
             printf("[QEMU]len is %d\n",len);
@@ -1220,6 +1223,48 @@ abi_long feed_message_to_buffer(CPUArchState *env, int syscall_num)
             set_flag_id1();
             is_last_response = 1;
             printf("[QEMU]send is over!\n");
+        }
+        pre_message_nums = message_nums;
+        offset = offset + len;
+        return len;
+    }
+    else if(protocol_id == 20185479)
+    {
+        if(pre_message_nums != message_nums){
+            get_current_message();
+            printf("[QEMU1]len is %d\n",len);
+            memcpy(buf, kl_val(cur_message)->mdata + offset, len);
+            printf("[QEMU1]recv buf is ");
+            for(int i=0;i<len;i++)
+            {
+                printf("%02x ",buf[i]);
+            }
+            printf("\n"); 
+        }else{
+            ret = kl_val(cur_message)->msize;
+            if(ret - offset > 0 && ret - offset < len){
+                len = ret - offset;
+                printf("[QEMU2]len is %d\n",len);
+                memcpy(buf, kl_val(cur_message)->mdata + offset, len);
+                printf("[QEMU2]recv buf is ");
+                for(int i=0;i<len;i++)
+                {
+                    printf("%02x ",buf[i]);
+                }
+                printf("\n");
+            }else if(ret - offset > 0 && ret - offset >= len){
+                printf("[QEMU3]len is %d\n",len);
+                memcpy(buf, kl_val(cur_message)->mdata + offset, len);
+
+                printf("[QEMU3]recv buf is ");
+                for(int i=0;i<len;i++)
+                {
+                    printf("%02x ",buf[i]);
+                }
+                printf("\n");
+            }else if(ret == offset){
+                return 0;
+            }
         }
         pre_message_nums = message_nums;
         offset = offset + len;
@@ -1383,6 +1428,22 @@ abi_long determine_local_or_not(int syscall_num, CPUArchState *env,  int *local_
                     }
                 }
             }
+            else if(protocol_id == 20185479) // DNS(Dnsmasq)
+            {
+                if(a1 == 2) //SOCK_STREAM(TCP)
+                {
+                    if(a0 == 2)
+                    {
+                        target_ulong new_fd = ori_network_socket + socket_times;
+                        socket_times++;
+                        printf("[QEMU]TCP(ipv4)\n");
+                        add_network_fd(new_fd, 1);
+                        sock_type = a0;
+                        *local_or_not = 1;
+                        return new_fd;
+                    }
+                }
+            }
         }
     }
     else if(syscall_num == 169) //bind
@@ -1496,7 +1557,7 @@ abi_long determine_local_or_not(int syscall_num, CPUArchState *env,  int *local_
         printf("[QEMU]send...%d\n",a0);
         if(if_exist_network_fd(a0))
         {
-            if(protocol_id != 20185478){
+            if(protocol_id == 20185476 || protocol_id == 20185477){
                 // socket建立之前(pre_welcome=0)，服务器发送的welcome信息不能被保存到响应文件。还有消息发送完毕后再次执行recv，接收输入为空，然后执行send。
                 if(!pre_welcome || is_last_response)
                 {
@@ -1547,7 +1608,8 @@ abi_long determine_local_or_not(int syscall_num, CPUArchState *env,  int *local_
                 }
                 *local_or_not = 1;
                 return a2;
-            }else{
+            }else if(protocol_id == 20185478 || protocol_id == 20185479)
+            {
                 // socket建立之前(pre_welcome=0)，服务器发送的welcome信息不能被保存到响应文件。还有消息发送完毕后再次执行recv，接收输入为空，然后执行send。
                 if(!pre_welcome || is_last_response)
                 {
@@ -1619,7 +1681,8 @@ abi_long determine_local_or_not(int syscall_num, CPUArchState *env,  int *local_
                 printf("[QEMU]construct messages end\n");
                 if_delete = 1;
             }
-            if(protocol_id != 20185478){
+            if(protocol_id == 20185476 || protocol_id == 20185477)
+            {
                 if(!is_first_message)
                 {
                     unlink(response_size);
@@ -1646,7 +1709,8 @@ abi_long determine_local_or_not(int syscall_num, CPUArchState *env,  int *local_
                 printf("[QEMU]feed_res is %d\n",feed_res);
                 printf("[QEMU]feed data in buf end\n");
                 return feed_res;
-            }else{
+            }else if(protocol_id == 20185478 || protocol_id == 20185479)
+            {
                 if(!is_first_message && a2 == 0)
                 {
                     unlink(response_size);
@@ -1849,8 +1913,8 @@ abi_long determine_local_or_not(int syscall_num, CPUArchState *env,  int *local_
             if(!tcp_fd->ipv4)
             {
                 remove_network_fd(a0);
-            }else if(tcp_fd->ipv4 && protocol_id == 20185478){
-                set_flag_id1();  // yk 为了Mosquitto提早结束。
+            }else if(tcp_fd->ipv4 && (protocol_id == 20185478 || protocol_id == 20185479)){
+                set_flag_id1();  // yk 为了Mosquitto和Dnsmasq提早结束。
             }
             *local_or_not = 1;
             return 0;
